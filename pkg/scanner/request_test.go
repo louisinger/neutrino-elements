@@ -39,7 +39,7 @@ func TestRequestOptions(t *testing.T) {
 		expected scanner.ScanRequest
 	}{
 		{
-			name:   "WithWatchItem",
+			name:   "WithWatchItems",
 			option: scanner.WithWatchItem(newFakeWatchItem([]byte("fake"))),
 			expected: scanner.ScanRequest{
 				Item: &fakeWatchItem{
@@ -65,6 +65,16 @@ func TestRequestOptions(t *testing.T) {
 				Item:         initialWatchItem,
 				StartHeight:  0,
 				IsPersistent: true,
+			},
+		},
+		{
+			name:   "WithReportsChan",
+			option: scanner.WithReportsChan(make(chan scanner.Report)),
+			expected: scanner.ScanRequest{
+				Item:         initialWatchItem,
+				StartHeight:  0,
+				IsPersistent: false,
+				Out:          make(chan scanner.Report),
 			},
 		},
 	}

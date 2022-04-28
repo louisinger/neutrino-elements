@@ -16,7 +16,7 @@ import (
 var repoFilter = inmemory.NewFilterInmemory()
 var repoHeader = inmemory.NewHeaderInmemory()
 
-func makeNigiriTestServices() (node.NodeService, scanner.ScannerService, <-chan scanner.Report) {
+func makeNigiriTestServices() (node.NodeService, scanner.ScannerService) {
 	n, err := node.New(node.NodeConfig{
 		Network:        "nigiri",
 		UserAgent:      "neutrino-elements:test",
@@ -43,12 +43,12 @@ func makeNigiriTestServices() (node.NodeService, scanner.ScannerService, <-chan 
 	}
 	s := scanner.New(repoFilter, repoHeader, blockSvc, h)
 
-	reportCh, err := s.Start()
+	err = s.Start()
 	if err != nil {
 		panic(err)
 	}
 
-	return n, s, reportCh
+	return n, s
 }
 
 func faucet(addr string) (string, error) {
@@ -63,7 +63,7 @@ func faucet(addr string) (string, error) {
 func TestWatch(t *testing.T) {
 	const address = "el1qq0mjw2fwsc20vr4q2ypq9w7dslg6436zaahl083qehyghv7td3wnaawhrpxphtjlh4xjwm6mu29tp9uczkl8cxfyatqc3vgms"
 
-	n, s, reportCh := makeNigiriTestServices()
+	n, s := makeNigiriTestServices()
 	defer s.Stop()
 	defer n.Stop()
 
@@ -77,7 +77,7 @@ func TestWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.Watch(scanner.WithStartBlock(tip.Height+1), scanner.WithWatchItem(watchItem))
+	reportCh := s.Watch(scanner.WithStartBlock(tip.Height+1), scanner.WithWatchItem(watchItem))
 	txid, err := faucet(address)
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestWatch(t *testing.T) {
 func TestWatchPersistent(t *testing.T) {
 	const address = "el1qqfs4ecf5427tyshnsq0x3jy3ad2tqfn03x3fqmxtyn2ycuvmk98urxmh9cdmr5zcqfs42l6a3kpyrk6pkxjx7yuvqsnuuckhp"
 
-	n, s, reportCh := makeNigiriTestServices()
+	n, s := makeNigiriTestServices()
 	defer s.Stop()
 	defer n.Stop()
 
@@ -107,7 +107,7 @@ func TestWatchPersistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.Watch(scanner.WithStartBlock(tip.Height+1), scanner.WithWatchItem(watchItem), scanner.WithPersistentWatch())
+	reportCh := s.Watch(scanner.WithStartBlock(tip.Height+1), scanner.WithWatchItem(watchItem), scanner.WithPersistentWatch())
 	txid, err := faucet(address)
 	if err != nil {
 		t.Fatal(err)

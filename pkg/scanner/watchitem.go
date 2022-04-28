@@ -59,6 +59,12 @@ type ScriptWatchItem struct {
 	outputScript []byte
 }
 
+func NewScriptWatchItem(script []byte) WatchItem {
+	return &ScriptWatchItem{
+		outputScript: script,
+	}
+}
+
 func NewScriptWatchItemFromAddress(addr string) (WatchItem, error) {
 	script, err := address.ToOutputScript(addr)
 	if err != nil {

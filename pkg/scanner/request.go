@@ -2,8 +2,9 @@ package scanner
 
 type ScanRequest struct {
 	StartHeight  uint32    // nil means scan from genesis block
-	Item         WatchItem // item to watch
+	Item         WatchItem // items to watch
 	IsPersistent bool      // if true, the request will be re-added with StartHeight = StartHeiht + 1
+	Out          chan Report
 }
 
 type ScanRequestOption func(req *ScanRequest)
@@ -23,6 +24,12 @@ func WithStartBlock(blockHeight uint32) ScanRequestOption {
 func WithPersistentWatch() ScanRequestOption {
 	return func(req *ScanRequest) {
 		req.IsPersistent = true
+	}
+}
+
+func WithReportsChan(reportsChan chan Report) ScanRequestOption {
+	return func(req *ScanRequest) {
+		req.Out = reportsChan
 	}
 }
 
