@@ -2,15 +2,12 @@ package scanner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil/gcs/builder"
-	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/sirupsen/logrus"
 	"github.com/vulpemventures/go-elements/network"
-	"github.com/vulpemventures/go-elements/payment"
 	"github.com/vulpemventures/go-elements/transaction"
 	"github.com/vulpemventures/neutrino-elements/pkg/blockservice"
 	"github.com/vulpemventures/neutrino-elements/pkg/protocol"
@@ -27,12 +24,19 @@ type Report struct {
 
 	// the request resolved by the report
 	Request *ScanRequest
+
+	// nil if no error
+	Error error
 }
 
-type RestorationResult struct {
-	LatestInternalIndex uint32
-	LatestExternalIndex uint32
-	Reports             []Report
+func (r Report) Resolved() bool {
+	return r.Error == nil
+}
+
+func newErrorReport(err error) Report {
+	return Report{
+		Error: err,
+	}
 }
 
 type ScannerService interface {
@@ -41,8 +45,8 @@ type ScannerService interface {
 	// Stop the scanner
 	Stop()
 	// Add a new request to the queue
-	Watch(...ScanRequestOption) <-chan Report
-	Rescan(xpub string) (*RestorationResult, error)
+	Watch(...ScanRequestOption) (<-chan Report, error)
+	Network() *network.Network
 }
 
 type scannerService struct {
@@ -92,100 +96,22 @@ func (s *scannerService) Stop() {
 	s.requestsQueue = newScanRequestQueue()
 }
 
-func (s *scannerService) Watch(opts ...ScanRequestOption) <-chan Report {
+func (s *scannerService) Watch(opts ...ScanRequestOption) (<-chan Report, error) {
 	req := newScanRequest(opts...)
 	if req.Out == nil {
 		req.Out = make(chan Report)
 	}
+
+	if req.EndHeight != 0 && req.StartHeight >= req.EndHeight {
+		return nil, fmt.Errorf("start height must be lower than end height")
+	}
+
 	s.requestsQueue.enqueue(req)
 
-	return req.Out
+	return req.Out, nil
 }
 
-func (s *scannerService) Rescan(xpub string) (*RestorationResult, error) {
-	if !s.started {
-		return nil, fmt.Errorf("utxo scanner not started")
-	}
-
-	hdNode, err := hdkeychain.NewKeyFromString(xpub)
-	if err != nil {
-		return nil, err
-	}
-
-	external, err := hdNode.Derive(0)
-	if err != nil {
-		return nil, err
-	}
-
-	internal, err := hdNode.Derive(1)
-	if err != nil {
-		return nil, err
-	}
-
-	latestExternalIndex, externalReports, err := s.rescanHdNode(external, 20)
-	if err != nil {
-		return nil, err
-	}
-
-	latestInternalIndex, internalReports, err := s.rescanHdNode(internal, 20)
-	if err != nil {
-		return nil, err
-	}
-
-	return &RestorationResult{
-		LatestExternalIndex: latestExternalIndex,
-		LatestInternalIndex: latestInternalIndex,
-		Reports:             append(externalReports, internalReports...),
-	}, nil
-}
-
-func (s *scannerService) rescanHdNode(node *hdkeychain.ExtendedKey, gaplimit int) (uint32, []Report, error) {
-	gap := 0
-	index := uint32(0)
-
-	reports := make([]Report, 0)
-
-	for gap < gaplimit {
-		items := make([]WatchItem, gaplimit-gap)
-		for i := 0; i < gaplimit-gap; i++ {
-			key, err := node.Derive(index)
-			if err != nil {
-				return 0, nil, errors.New("error deriving key")
-			}
-
-			index++
-
-			pubkey, err := key.ECPubKey()
-			if err != nil {
-				return 0, nil, errors.New("error deriving pubkey")
-			}
-
-			script := payment.FromPublicKey(pubkey, s.network(), nil).WitnessScript
-			items[i] = NewScriptWatchItem(script)
-		}
-
-		channels := make([]<-chan Report, len(items))
-
-		for i, item := range items {
-			channels[i] = s.Watch(
-				WithWatchItem(item),
-				WithStartBlock(0),
-			)
-		}
-
-		for _, channel := range channels {
-			report := <-channel // wait for report
-			reports = append(reports, report)
-			// TODO handle "not found" report (need WithEndBlock for instance in request)
-			// if (error) gap++ else gap = 0
-			gap = 0
-		}
-	}
-
-	return index, reports, nil
-}
-
-func (s *scannerService) network() *network.Network {
+func (s *scannerService) Network() *network.Network {
 	switch s.genesisHash.String() {
 	case protocol.LiquidGenesisBlockHash:
 		return &network.Liquid
@@ -286,12 +212,16 @@ func (s *scannerService) requestWorker(startHeight uint32) error {
 
 				// if the request is persistent, the scanner will keep watching the item at the next block height
 				if report.Request.IsPersistent {
-					s.Watch(
+					_, err := s.Watch(
 						WithStartBlock(report.BlockHeight+1),
+						WithEndBlock(report.Request.EndHeight),
 						WithWatchItem(report.Request.Item),
 						WithReportsChan(report.Request.Out),
 						WithPersistentWatch(),
 					)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -299,6 +229,16 @@ func (s *scannerService) requestWorker(startHeight uint32) error {
 			// this will remove the resolved requests from the batch
 			nextBatch = remainReqs
 		}
+
+		filteredBatch := make([]*ScanRequest, 0)
+		for _, req := range nextBatch {
+			if req.EndHeight != 0 && nextHeight >= req.EndHeight {
+				req.Out <- newErrorReport(ErrEndWithoutMatch)
+			} else {
+				filteredBatch = append(filteredBatch, req)
+			}
+		}
+		nextBatch = filteredBatch
 
 		// increment the height to scan
 		// if nothing was found, we can just continue with same batch and next height

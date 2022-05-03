@@ -1,9 +1,16 @@
 package scanner
 
+import "errors"
+
+var (
+	ErrEndWithoutMatch = errors.New("the watch item does not match any transaction in the block height range specified")
+)
+
 type ScanRequest struct {
 	StartHeight  uint32    // nil means scan from genesis block
-	Item         WatchItem // items to watch
-	IsPersistent bool      // if true, the request will be re-added with StartHeight = StartHeiht + 1
+	EndHeight    uint32    // nil means scan until we math a tx (wait for new blocks if needed)
+	Item         WatchItem // item to watch
+	IsPersistent bool      // if true, another req will be watched if a report has been found
 	Out          chan Report
 }
 
@@ -16,6 +23,12 @@ func WithWatchItem(item WatchItem) ScanRequestOption {
 }
 
 func WithStartBlock(blockHeight uint32) ScanRequestOption {
+	return func(req *ScanRequest) {
+		req.StartHeight = blockHeight
+	}
+}
+
+func WithEndBlock(blockHeight uint32) ScanRequestOption {
 	return func(req *ScanRequest) {
 		req.StartHeight = blockHeight
 	}
