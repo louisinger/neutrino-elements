@@ -53,14 +53,9 @@ func (no *node) syncWithPeer(peerID peer.PeerID) error {
 		return fmt.Errorf("peer %s not found", peerID)
 	}
 
-	locator, err := no.blockHeadersDb.LatestBlockLocator(context.Background())
+	locator, err := no.getLatestBlockLocator()
 	if err != nil {
-		genesisHash, err := no.getGenesisBlockHash()
-		if err != nil {
-			return err
-		}
-
-		locator = blockchain.BlockLocator{genesisHash}
+		return err
 	}
 
 	msg, err := protocol.NewMsgGetHeaders(no.Network, zeroHash, locator)
@@ -74,6 +69,19 @@ func (no *node) syncWithPeer(peerID peer.PeerID) error {
 	}
 
 	return nil
+}
+
+func (no *node) getLatestBlockLocator() (blockchain.BlockLocator, error) {
+	locator, err := no.blockHeadersDb.LatestBlockLocator(context.Background())
+	if err != nil {
+		genesisHash, err := no.getGenesisBlockHash()
+		if err != nil {
+			return nil, err
+		}
+
+		locator = blockchain.BlockLocator{genesisHash}
+	}
+	return locator, nil
 }
 
 func (n *node) checkSync(p peer.Peer) {

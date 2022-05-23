@@ -77,7 +77,7 @@ func (msg *MsgCFilter) UnmarshalBinary(r io.Reader) error {
 
 	// invalid filter type
 	if msg.FilterType != 0 {
-		return fmt.Errorf("invalid filter type")
+		return fmt.Errorf("invalid filter type %d", msg.FilterType)
 	}
 
 	var blockHeaderHash [hashLen]byte

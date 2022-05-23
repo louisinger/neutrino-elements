@@ -161,7 +161,7 @@ Loop:
 		}
 
 		var msgHeader protocol.MessageHeader
-		if err := binary.NewDecoder(bytes.NewReader(tmp[:n])).Decode(&msgHeader); err != nil {
+		if err := binary.NewDecoder(bytes.NewReader(tmp[:n])).Decode(&msgHeader); err != nil && err != io.EOF {
 			logrus.Errorf("invalid header: %+v", err)
 			continue
 		}
@@ -170,8 +170,6 @@ Loop:
 			logrus.Error(err)
 			continue
 		}
-
-		logrus.Debugf("received message: %s", msgHeader.Command)
 
 		switch msgHeader.CommandString() {
 		case "version":
@@ -264,7 +262,6 @@ func (no node) createNodeVersionMsg(p peer.Peer) (*protocol.Message, error) {
 
 // sendMessage first Marshal the `msg` arg and then use the `conn` to send it.
 func (no *node) sendMessage(conn io.Writer, msg *protocol.Message) error {
-	logrus.Debugf("node sends message: %s", msg.CommandString())
 	msgSerialized, err := binary.Marshal(msg)
 	if err != nil {
 		return err

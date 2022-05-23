@@ -19,14 +19,20 @@ func startAction(state *State) cli.ActionFunc {
 	return func(c *cli.Context) error {
 		peers := c.StringSlice("connect")
 		if len(peers) == 0 {
-			return cli.Exit("peers must be specified", 1)
+			return cli.Exit("connect must be specified", 1)
 		}
 
 		addr := c.String("address")
+		net := c.String("network")
+		if net == "" {
+			net = "nigiri"
+		}
+
+		logrus.Infof("connect to network: %s (magic: %x)", net, protocol.Networks[net])
 
 		// Create a new peer node.
 		node, err := node.New(node.NodeConfig{
-			Network:        "nigiri",
+			Network:        net,
 			UserAgent:      "neutrino-elements:0.0.1",
 			FiltersDB:      state.filtersDB,
 			BlockHeadersDB: state.blockHeadersDB,
@@ -35,7 +41,6 @@ func startAction(state *State) cli.ActionFunc {
 			panic(err)
 		}
 
-		// err = node.Run("liquid-testnet.blockstream.com:18892") // testnet
 		err = node.Start(peers[0]) // regtest
 		if err != nil {
 			panic(err)
@@ -53,13 +58,23 @@ func startAction(state *State) cli.ActionFunc {
 			}
 		}
 
-		genesisBlockHash := protocol.GetCheckpoints(protocol.MagicNigiri)[0]
+		magic := protocol.MagicNigiri
+		if net == "testnet" {
+			magic = protocol.MagicLiquidTestnet
+		}
+
+		genesisBlockHash := protocol.GetCheckpoints(magic)[0]
 		h, err := chainhash.NewHashFromStr(genesisBlockHash)
 		if err != nil {
 			panic(err)
 		}
 
-		blockSvc := blockservice.NewEsploraBlockService("http://localhost:3001")
+		esploraURL := "http://localhost:3001"
+		if net == "testnet" {
+			esploraURL = "https://liquid-testnet.sevenlabs.dev/"
+		}
+
+		blockSvc := blockservice.NewEsploraBlockService(esploraURL)
 		scanSvc := scanner.New(state.filtersDB, state.blockHeadersDB, blockSvc, h)
 		reportCh, err := scanSvc.Start()
 		if err != nil {

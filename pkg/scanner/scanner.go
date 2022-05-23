@@ -110,7 +110,7 @@ func (s *scannerService) requestsManager(ch chan<- Report) {
 		nextRequest := s.requestsQueue.peek()
 		err := s.requestWorker(nextRequest.StartHeight, ch)
 		if err != nil {
-			logrus.Errorf("error while scanning: %v", err)
+			logrus.Debugf("error while scanning: %v", err)
 		}
 
 		// check if we should quit the routine

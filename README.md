@@ -8,6 +8,12 @@
 
 Neutrino + Elements
 
+## See in action
+
+```
+./bin/neutrinoelements-cli start -a YOUR_ADDRESS_TO_WATCH_HERE --network testnet --connect liquid-testnet.sevenlabs.dev:18886
+```
+
 ## Overview
 
 neutrino-elements uses Compact Block Filter (BIP0158) to implement a light client for [elements](https://elementsproject.org/)-based networks.

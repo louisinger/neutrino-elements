@@ -20,7 +20,7 @@ type State struct {
 }
 
 func main() {
-	logrus.SetLevel(logrus.DebugLevel)
+	// logrus.SetLevel(logrus.DebugLevel)
 
 	state := &State{
 		filtersDB:      inmemory.NewFilterInmemory(),
@@ -49,6 +49,11 @@ func main() {
 					Name:     "connect",
 					Usage:    "list of host:port to connect to",
 					Required: true,
+				},
+				&cli.StringFlag{
+					Name:    "network",
+					Usage:   "network to use (nigiri or testnet only)",
+					Aliases: []string{"n"},
 				},
 			},
 			Action: startAction(state),
