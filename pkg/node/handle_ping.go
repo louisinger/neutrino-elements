@@ -24,9 +24,7 @@ func (n *node) addPeer(peer peer.Peer) error {
 	n.Peers[id] = peer
 	n.peersPongCh[id] = make(chan uint64)
 
-	if len(n.Peers) == 1 {
-		n.checkSync(peer)
-	}
+	n.syncWithPeer(peer.ID())
 
 	return nil
 }
@@ -89,7 +87,7 @@ func (n *node) monitorPeer(peer peer.Peer) {
 			}
 
 			if _, err := peer.Connection().Write(msg); err != nil {
-				n.disconnectPeer(peer.ID())
+				logrus.Warnf("monitorPeer, Write: %v", err)
 			}
 
 			logrus.Debugf("sent 'ping' to %s", peer)

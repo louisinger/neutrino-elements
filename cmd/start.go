@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -104,8 +105,9 @@ func startAction(state *State) cli.ActionFunc {
 		}
 
 		signalQuit := make(chan os.Signal, 1)
-		signal.Notify(signalQuit, os.Interrupt)
+		signal.Notify(signalQuit, os.Interrupt, syscall.SIGTERM)
 		<-signalQuit
+		logrus.Info("Shutting down...")
 		node.Stop()
 		scanSvc.Stop()
 		return nil

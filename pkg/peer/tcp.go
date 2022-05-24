@@ -10,6 +10,7 @@ import (
 // peerTCP implements Peer interface.
 // it lets to connect to an elements node via TCP	conn
 type peerTCP struct {
+	peerAddr       string
 	networkAddress *protocol.Addr
 	tcpConnection  net.Conn
 }
@@ -28,6 +29,7 @@ func NewPeerTCP(peerAddr string) (Peer, error) {
 	}
 
 	return &peerTCP{
+		peerAddr:       peerAddr,
 		networkAddress: netAddress,
 		tcpConnection:  conn,
 	}, nil
@@ -35,7 +37,7 @@ func NewPeerTCP(peerAddr string) (Peer, error) {
 
 // ID returns peer ID. Must be unique in the network.
 func (p peerTCP) ID() PeerID {
-	return PeerID(p.tcpConnection.LocalAddr().String())
+	return PeerID(p.tcpConnection.RemoteAddr().String())
 }
 
 // ReadWriteCloser interface using to communicate with the peer.

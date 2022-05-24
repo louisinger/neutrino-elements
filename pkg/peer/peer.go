@@ -17,4 +17,5 @@ type Peer interface {
 	Connection() io.ReadWriteCloser
 	// Returns the Network Address of the peer
 	Addr() *protocol.Addr
+	String() string
 }

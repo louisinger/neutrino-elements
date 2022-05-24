@@ -3,6 +3,7 @@ package node
 import (
 	"io"
 
+	"github.com/sirupsen/logrus"
 	"github.com/vulpemventures/neutrino-elements/pkg/binary"
 	"github.com/vulpemventures/neutrino-elements/pkg/peer"
 	"github.com/vulpemventures/neutrino-elements/pkg/protocol"
@@ -21,6 +22,7 @@ func (no node) handleInv(header *protocol.MessageHeader, p peer.Peer) error {
 	getData.Inventory = inv.Inventory
 	getData.Count = inv.Count
 
+	logrus.Debugf("sending getdata to peer %s", p.ID())
 	getDataMsg, err := protocol.NewMessage("getdata", no.Network, getData)
 	if err != nil {
 		return err

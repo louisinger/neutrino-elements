@@ -109,7 +109,7 @@ func (s *scannerService) requestsManager(ch chan<- Report) {
 		// get the next request without removing it from the queue
 		nextRequest := s.requestsQueue.peek()
 		err := s.requestWorker(nextRequest.StartHeight, ch)
-		if err != nil {
+		if err != nil && err != repository.ErrNoBlocksHeaders {
 			logrus.Debugf("error while scanning: %v", err)
 		}
 

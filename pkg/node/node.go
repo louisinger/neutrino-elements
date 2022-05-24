@@ -102,6 +102,17 @@ func (no node) AddOutboundPeer(outbound peer.Peer) error {
 		return err
 	}
 
+	// notify the peer that we would like to receive block header via headers messages
+	sendHeaders, err := protocol.NewSendHeadersMessage(no.Network)
+	if err != nil {
+		return err
+	}
+
+	err = no.sendMessage(outbound.Connection(), sendHeaders)
+	if err != nil {
+		return err
+	}
+
 	go no.handlePeerMessages(outbound)
 
 	return nil
@@ -132,20 +143,6 @@ func (no *node) Stop() error {
 	return nil
 }
 
-// Return the best peer (now randomly)
-// TODO : implement a better way to select the best peer (eg. by latency)
-func (no node) getBestPeerForSync() peer.Peer {
-	if len(no.Peers) == 0 {
-		return nil
-	}
-
-	for _, p := range no.Peers {
-		return p
-	}
-
-	return nil
-}
-
 // handlePeerMessages handles messages coming from peers.
 func (no node) handlePeerMessages(p peer.Peer) {
 	tmp := make([]byte, protocol.MsgHeaderLength)
@@ -156,7 +153,15 @@ Loop:
 		n, err := conn.Read(tmp)
 		if err != nil {
 			logrus.Errorf(err.Error())
-			no.DisconCh <- p.ID()
+			no.disconnectPeer(p.ID())
+			if err == io.EOF {
+				logrus.Infof("peer %s disconnected due to EOF, try to reconnect...", p.ID())
+				reconnectPeer, err := peer.NewPeerTCP(p.String())
+				if err != nil {
+					logrus.Errorf(err.Error())
+				}
+				no.AddOutboundPeer(reconnectPeer)
+			}
 			break Loop
 		}
 
@@ -167,7 +172,7 @@ Loop:
 		}
 
 		if err := msgHeader.Validate(); err != nil {
-			logrus.Error(err)
+			logrus.Errorf("invalid header: %+v", err)
 			continue
 		}
 
@@ -296,33 +301,6 @@ func (no *node) monitorBlockHeaders() {
 			if err != nil {
 				logrus.Error(err)
 				continue
-			}
-
-			if len(no.Peers) > 0 {
-				hash, err := newHeader.Hash()
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-
-				getcFilter := protocol.MsgGetCFilters{
-					FilterType:  0,
-					StartHeight: newHeader.Height,
-					StopHash:    hash,
-				}
-
-				msg, err := protocol.NewMessage("getcfilters", no.Network, &getcFilter)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-
-				conn := no.getBestPeerForSync().Connection()
-				err = no.sendMessage(conn, msg)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
 			}
 		}
 	}
